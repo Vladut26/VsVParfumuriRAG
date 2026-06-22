@@ -1,11 +1,15 @@
-[variables]
-NODE_VERSION = "22.14.0"
+[phases.setup]
+nixPkgs = ["nodejs_22"]
+
+[phases.install]
+cmds = [
+  "export NODE_VERSION=22.14.0",
+  "npm install --include=optional"
+]
 
 [phases.build]
 cmds = [
-  "rm -f package-lock.json",
-  "find node_modules -mindepth 1 -not -name '.cache' -delete 2>/dev/null || true",
-  "npm install --include=optional",
+  "export NODE_VERSION=22.14.0",
   "npm run build"
 ]
 
