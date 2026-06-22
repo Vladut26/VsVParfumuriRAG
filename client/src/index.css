@@ -1,0 +1,114 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: dark --default;
+}
+
+/* ── Google Fonts ────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
+
+/* ── Custom design tokens ────────────────────────────── */
+@layer base {
+  :root {
+    --font-display: "Cormorant Garamond", Georgia, serif;
+    --font-body:    "DM Sans", system-ui, sans-serif;
+    --font-mono:    "DM Mono", "Fira Code", monospace;
+
+    --vsv-bg:       #0a0a0f;
+    --vsv-surface:  #13131a;
+    --vsv-border:   #1e1e2e;
+    --vsv-accent:   #818cf8;
+    --vsv-muted:    #94a3b8;
+  }
+
+  html {
+    font-family: var(--font-body);
+    scroll-behavior: smooth;
+    background: var(--vsv-bg);
+  }
+
+  body {
+    background: var(--vsv-bg);
+    color: #e2e8f0;
+    min-height: 100dvh;
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+}
+
+/* ── Navbar ──────────────────────────────────────────── */
+.vsv-navbar {
+  background: rgba(10, 10, 15, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--vsv-border);
+  color: #f1f5f9;
+}
+
+/* ── Card ────────────────────────────────────────────── */
+.vsv-card {
+  background: var(--vsv-surface);
+  border: 1px solid var(--vsv-border);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.vsv-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  border-color: var(--vsv-accent);
+}
+
+/* ── Shimmer skeleton ────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.vsv-skeleton {
+  background: linear-gradient(90deg, #13131a 25%, #1e1e2e 50%, #13131a 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite;
+  border-radius: 0.75rem;
+}
+
+/* ── Sentiment badge colours ─────────────────────────── */
+.badge-positive {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+.badge-negative {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+.badge-mixed {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+/* ── Animations ──────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.vsv-fade-up {
+  animation: fadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes stagger {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.vsv-stagger > * {
+  animation: stagger 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.vsv-stagger > *:nth-child(1)  { animation-delay: 0.05s; }
+.vsv-stagger > *:nth-child(2)  { animation-delay: 0.10s; }
+.vsv-stagger > *:nth-child(3)  { animation-delay: 0.15s; }
+.vsv-stagger > *:nth-child(4)  { animation-delay: 0.20s; }
+.vsv-stagger > *:nth-child(5)  { animation-delay: 0.25s; }
+.vsv-stagger > *:nth-child(6)  { animation-delay: 0.30s; }
+.vsv-stagger > *:nth-child(7)  { animation-delay: 0.35s; }
+.vsv-stagger > *:nth-child(8)  { animation-delay: 0.40s; }

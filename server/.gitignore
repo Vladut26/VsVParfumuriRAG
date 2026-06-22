@@ -1,0 +1,24 @@
+# Build and binary targets
+target/
+*.class
+*.jar
+*.war
+
+# Maven wrappers and generation artifacts
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE Specific Files (Eclipse, IntelliJ, NetBeans)
+.idea/
+*.iml
+*.iws
+.classpath
+.project
+.settings/
+bin/
+
+# Local configuration logs and overrides
+*.log
+logs/
+.env
