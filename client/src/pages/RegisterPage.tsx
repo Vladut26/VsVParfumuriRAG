@@ -23,8 +23,8 @@ const RegisterPage: FC = () => {
     }
     setLoading(true);
     try {
-      await auth.register(form.name, form.email, form.password);
-      toast.addToast("Cont creat cu succes! 🎉", "success");
+    await auth.register({ name: form.name, email: form.email, password: form.password });      
+    toast.addToast("Cont creat cu succes! 🎉", "success");
       navigate("/");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error || "Eroare la inregistrare.";
