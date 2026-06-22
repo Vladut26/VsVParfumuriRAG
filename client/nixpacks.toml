@@ -1,17 +1,11 @@
 [phases.setup]
-nixPkgs = ["nodejs_22"]
+nixPkgs = ["nodejs_23"]
 
 [phases.install]
-cmds = [
-  "export NODE_VERSION=22.14.0",
-  "npm install --include=optional"
-]
+cmds = ["npm install --include=optional"]
 
 [phases.build]
-cmds = [
-  "export NODE_VERSION=22.14.0",
-  "npm run build"
-]
+cmds = ["npm run build"]
 
 [start]
 cmd = "npx serve dist -s -l $PORT"
