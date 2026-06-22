@@ -18,7 +18,7 @@
 	<description>VSV Parfumuri – Spring Boot 4 Backend</description>
 
 	<properties>
-		<java.version>24</java.version>
+		<java.version>21</java.version>
 		<jjwt.version>0.12.6</jjwt.version>
 	</properties>
 
