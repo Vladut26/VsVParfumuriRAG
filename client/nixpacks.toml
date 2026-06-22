@@ -3,7 +3,8 @@ NODE_VERSION = "22.14.0"
 
 [phases.build]
 cmds = [
-  "rm -rf node_modules package-lock.json",
+  "rm -f package-lock.json",
+  "find node_modules -mindepth 1 -not -name '.cache' -delete 2>/dev/null || true",
   "npm install --include=optional",
   "npm run build"
 ]
