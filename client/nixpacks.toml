@@ -1,8 +1,12 @@
-[phases.setup]
-nixPkgs = ["nodejs_22"]
+[variables]
+NODE_VERSION = "22.14.0"
 
 [phases.build]
-cmds = ["npm install --include=optional", "npm run build"]
+cmds = [
+  "rm -rf node_modules package-lock.json",
+  "npm install --include=optional",
+  "npm run build"
+]
 
 [start]
 cmd = "npx serve dist -s -l $PORT"
