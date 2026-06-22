@@ -298,9 +298,9 @@ const ProductDetailsPage: FC = () => {
             <nav className="flex items-center gap-2 text-xs text-gray-400 mb-6 flex-wrap">
               <Link to="/" className="hover:text-[var(--gold-dark)] transition-colors">Acasa</Link>
               <span className="text-gray-300">›</span>
-              {product.categoryName && (
+              {product.category?.name && (
                 <>
-                  <span className="hover:text-[var(--gold-dark)] transition-colors">{product.categoryName}</span>
+                  <span className="hover:text-[var(--gold-dark)] transition-colors">{product.category?.name}</span>
                   <span className="text-gray-300">›</span>
                 </>
               )}

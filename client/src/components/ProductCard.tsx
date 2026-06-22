@@ -27,11 +27,13 @@ const ProductCard: FC<ProductCardProps> = ({ product, onEdit, onDelete }) => {
   const toast     = useToastStore();
 
   const [hovered, setHovered] = useState(false);
-  const isNew = useMemo(() => {
-  if (!product.createdAt) return false;
-  const nowTimestamp = Date.now(); // isolated instantiation
-  return (nowTimestamp - new Date(product.createdAt).getTime()) < 7 * 24 * 60 * 60 * 1000;
-  }, [product.createdAt]);
+const isNew = useMemo(() => {
+  const extendedProduct = product as typeof product & { createdAt?: string };
+  if (!extendedProduct.createdAt) return false;
+
+  const nowTimestamp = Date.now();
+  return (nowTimestamp - new Date(extendedProduct.createdAt).getTime()) < 7 * 24 * 60 * 60 * 1000;
+}, [product]);
 
   const isFav   = favorites.isFavorite(product.id);
   const inStock = (product.stock?.quantity ?? 0) > 0;

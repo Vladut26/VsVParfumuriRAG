@@ -20,7 +20,7 @@ const ToastModal: FC = () => {
   return (
     <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none max-w-sm w-full">
       {toasts.map((t) => (
-        <ToastItem key={t.id} id={t.id} message={t.message} type={t.type} onClose={removeToast} />
+        <ToastItem key={t.id} id={String(t.id)} message={t.message} type={t.type} onClose={(id)=>removeToast(Number(id))} />
       ))}
     </div>
   );
