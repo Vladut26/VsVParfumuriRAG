@@ -153,24 +153,18 @@ async def chat(request: ChatRequest) -> ChatResponse:
     # Build recommended product cards — only products Gemini actually mentioned
     reply_lower = reply.lower()
     mentioned = []
-    not_mentioned = []
 
     for p in relevant:
-        name = (p.get("name") or "").lower()
-        brand = (p.get("brand") or "").lower()
-        # Check if product name or "brand + descriptor" appears in the reply
-        if name and name in reply_lower:
+        name = (p.get("name") or "").strip()
+        if not name:
+            continue
+        # Match full product name in the reply
+        if name.lower() in reply_lower:
             mentioned.append(p)
-        elif brand and any(word in reply_lower for word in name.split() if len(word) > 3):
-            mentioned.append(p)
-        else:
-            not_mentioned.append(p)
 
-    # Show mentioned products first, pad with others if needed (max 4)
-    cards_source = (mentioned + not_mentioned)[:4] if mentioned else relevant[:4]
-
+    # Only show products that were actually mentioned — no padding
     rec_products = []
-    for p in cards_source:
+    for p in mentioned:
         stock = p.get("stock") or {}
         qty = stock.get("quantity", 0) or 0
         cat = p.get("category") or {}
