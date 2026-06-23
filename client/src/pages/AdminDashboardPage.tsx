@@ -1,197 +1,129 @@
 import { useState, useEffect, useMemo, type FC } from "react";
-import { Link }            from "react-router-dom";
-import MainHeader          from "../components/MainHeader";
-import MainFooter          from "../components/MainFooter";
-import AdminSubHeader      from "../components/AdminSubHeader";
-import ConfirmModal        from "../components/ConfirmModal";
-import { useConfirm }      from "../hooks/useConfirm";
-import { useAuthStore }    from "../stores/auth";
-import { useToastStore }   from "../stores/toast";
-import APIService          from "../services/APIService";
+import { Link }        from "react-router-dom";
+import MainHeader      from "../components/MainHeader";
+import MainFooter      from "../components/MainFooter";
+import APIService      from "../services/APIService";
+import { useToastStore } from "../stores/toast";
 
-interface Review {
-  id: number;
-  userId: number;
-  productId: number;
-  userName: string;
-  rating: number;
-  comment: string;
-  sentiment: string;
-  sentimentScore: number;
-  sentimentSummary: string;
-  createdAt: string;
+interface Order {
+  id: number; status: string; totalAmount: number;
+  paymentMethod: string; createdAt: string;
+  items: { productName: string; quantity: number; lineTotal: number }[];
 }
 
-interface ProductInfo {
-  id: number;
-  name: string;
-  brand?: string;
-  imageUrl?: string;
+interface ReviewSummary {
+  productId: number; totalReviews: number;
+  averageRating: number; dominantSentiment: string;
 }
 
-type SortKey = "date" | "rating" | "sentimentScore" | "sentiment";
-type SortDir = "asc" | "desc";
-type SentimentFilter = "all" | "positive" | "negative" | "mixed" | "pending";
-
-const SENTIMENT_CONFIG: Record<string, { cls: string; icon: string; label: string; barColor: string }> = {
-  positive: { cls: "bg-emerald-50 text-emerald-700 border-emerald-100", icon: "😊", label: "Pozitiv", barColor: "bg-emerald-400" },
-  negative: { cls: "bg-red-50 text-red-600 border-red-100",           icon: "😞", label: "Negativ", barColor: "bg-red-400" },
-  mixed:    { cls: "bg-amber-50 text-amber-700 border-amber-100",     icon: "😐", label: "Mixt",    barColor: "bg-amber-400" },
-  pending:  { cls: "bg-gray-50 text-gray-400 border-gray-100",        icon: "🔄", label: "Pending", barColor: "bg-gray-300" },
+const STATUS_COLORS: Record<string, string> = {
+  PENDING:   "bg-amber-400",
+  CONFIRMED: "bg-blue-400",
+  SHIPPED:   "bg-indigo-400",
+  DELIVERED: "bg-emerald-400",
+  CANCELLED: "bg-red-400",
 };
 
-const AdminReviewsPage: FC = () => {
-  const auth  = useAuthStore();
+const AdminDashboardPage: FC = () => {
   const toast = useToastStore();
-  const { confirm, confirmModalProps } = useConfirm();
+  const [orders,  setOrders]  = useState<Order[]>([]);
+  const [reviews, setReviews] = useState<ReviewSummary[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [reviews, setReviews]           = useState<Review[]>([]);
-  const [products, setProducts]         = useState<Map<number, ProductInfo>>(new Map());
-  const [loading, setLoading]           = useState(true);
-  const [sortKey, setSortKey]           = useState<SortKey>("date");
-  const [sortDir, setSortDir]           = useState<SortDir>("desc");
-  const [sentimentFilter, setSentimentFilter] = useState<SentimentFilter>("all");
-  const [searchQuery, setSearchQuery]   = useState("");
-
-  // ── Load all reviews and products ──────────────────────────────
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        // Fetch all products to map IDs to names
-        const prodRes = await APIService.getProducts({ size: 500 });
-        const prodData = prodRes.data as { content: ProductInfo[] };
-        const prodMap = new Map<number, ProductInfo>();
-        (prodData.content || []).forEach(p => prodMap.set(p.id, p));
-        setProducts(prodMap);
-
-        // Fetch reviews for each product that has reviews
-        const allReviews: Review[] = [];
-        const reviewPromises = Array.from(prodMap.keys()).map(async (pid) => {
-          try {
-            const rRes = await APIService.getReviews(String(pid));
-            const revs = rRes.data as Review[];
-            revs.forEach(r => { r.productId = pid; });
-            allReviews.push(...revs);
-          } catch { /* some products have no reviews */ }
-        });
-
-        await Promise.all(reviewPromises);
-        setReviews(allReviews);
-      } catch {
-        toast.addToast("Eroare la incarcarea recenziilor.", "error");
-      } finally {
-        setLoading(false);
-      }
-    };
-    void loadData();
+    Promise.all([
+      APIService.getAllOrders(),
+      APIService.getReviewSummary?.() ?? Promise.resolve({ data: [] }),
+    ])
+      .then(([oRes, rRes]) => {
+        setOrders(oRes.data as Order[]);
+        setReviews(rRes.data as ReviewSummary[]);
+      })
+      .catch(() => toast.addToast("Eroare la încărcarea datelor.", "error"))
+      .finally(() => setLoading(false));
   }, []);
 
   // ── Computed stats ─────────────────────────────────────────────
   const stats = useMemo(() => {
-    const analyzed = reviews.filter(r => r.sentiment && r.sentiment !== "pending");
-    const pos = analyzed.filter(r => r.sentiment === "positive").length;
-    const neg = analyzed.filter(r => r.sentiment === "negative").length;
-    const mix = analyzed.filter(r => r.sentiment === "mixed").length;
-    const pen = reviews.filter(r => !r.sentiment || r.sentiment === "pending").length;
-    const avgRating = reviews.length > 0
-      ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
-    const avgScore = analyzed.length > 0
-      ? analyzed.reduce((s, r) => s + (r.sentimentScore || 0), 0) / analyzed.length : 0;
+    const active     = orders.filter((o) => o.status !== "CANCELLED");
+    const revenue    = active.reduce((s, o) => s + Number(o.totalAmount), 0);
+    const avgOrder   = active.length > 0 ? revenue / active.length : 0;
+    const byStatus: Record<string, number> = {};
+    orders.forEach((o) => { byStatus[o.status] = (byStatus[o.status] || 0) + 1; });
 
-    // Score distribution (1-5)
-    const scoreDist = [0, 0, 0, 0, 0];
-    analyzed.forEach(r => {
-      if (r.sentimentScore >= 1 && r.sentimentScore <= 5)
-        scoreDist[r.sentimentScore - 1]++;
+    // Revenue by day (last 30 days)
+    const dailyRev: Record<string, number> = {};
+    active.forEach((o) => {
+      const day = o.createdAt?.slice(0, 10) || "unknown";
+      dailyRev[day] = (dailyRev[day] || 0) + Number(o.totalAmount);
     });
+    const dailySorted = Object.entries(dailyRev)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-14);
 
-    return { pos, neg, mix, pen, total: reviews.length, analyzed: analyzed.length, avgRating, avgScore, scoreDist };
-  }, [reviews]);
-
-  // ── Filtered and sorted reviews ────────────────────────────────
-  const filteredReviews = useMemo(() => {
-    let result = [...reviews];
-
-    // Filter by sentiment
-    if (sentimentFilter !== "all") {
-      if (sentimentFilter === "pending") {
-        result = result.filter(r => !r.sentiment || r.sentiment === "pending");
-      } else {
-        result = result.filter(r => r.sentiment === sentimentFilter);
-      }
-    }
-
-    // Filter by search
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(r => {
-        const prod = products.get(r.productId);
-        return r.comment.toLowerCase().includes(q)
-          || r.userName.toLowerCase().includes(q)
-          || prod?.name.toLowerCase().includes(q)
-          || prod?.brand?.toLowerCase().includes(q);
+    // Top products by revenue
+    const productRev: Record<string, { name: string; revenue: number; qty: number }> = {};
+    active.forEach((o) => {
+      o.items?.forEach((item) => {
+        const key = item.productName;
+        if (!productRev[key]) productRev[key] = { name: key, revenue: 0, qty: 0 };
+        productRev[key].revenue += Number(item.lineTotal);
+        productRev[key].qty     += item.quantity;
       });
-    }
+    });
+    const topProducts = Object.values(productRev)
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 8);
 
-    // Sort
-    result.sort((a, b) => {
-      let cmp = 0;
-      switch (sortKey) {
-        case "date":           cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); break;
-        case "rating":         cmp = a.rating - b.rating; break;
-        case "sentimentScore": cmp = (a.sentimentScore || 0) - (b.sentimentScore || 0); break;
-        case "sentiment": {
-          const order: Record<string, number> = { positive: 3, mixed: 2, negative: 1, pending: 0 };
-          cmp = (order[a.sentiment] || 0) - (order[b.sentiment] || 0);
-          break;
-        }
-      }
-      return sortDir === "desc" ? -cmp : cmp;
+    // Sentiment distribution from reviews
+    let sentPos = 0, sentMix = 0, sentNeg = 0;
+    reviews.forEach((r) => {
+      if (r.dominantSentiment === "positive") sentPos += r.totalReviews;
+      else if (r.dominantSentiment === "negative") sentNeg += r.totalReviews;
+      else sentMix += r.totalReviews;
+    });
+    const sentTotal = sentPos + sentMix + sentNeg;
+
+    // Payment method distribution
+    const paymentMethods: Record<string, number> = {};
+    orders.forEach((o) => {
+      const m = o.paymentMethod || "unknown";
+      paymentMethods[m] = (paymentMethods[m] || 0) + 1;
     });
 
-    return result;
-  }, [reviews, sentimentFilter, searchQuery, sortKey, sortDir, products]);
+    return {
+      totalOrders: orders.length, revenue, avgOrder,
+      byStatus, dailySorted, topProducts,
+      sentPos, sentMix, sentNeg, sentTotal,
+      paymentMethods,
+      totalReviews: reviews.reduce((s, r) => s + r.totalReviews, 0),
+      avgRating: reviews.length > 0
+        ? reviews.reduce((s, r) => s + r.averageRating * r.totalReviews, 0) /
+          reviews.reduce((s, r) => s + r.totalReviews, 0)
+        : 0,
+    };
+  }, [orders, reviews]);
 
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortKey(key); setSortDir("desc"); }
-  };
-
-  const handleDelete = async (reviewId: number) => {
-    const ok = await confirm({
-      title: "Stergere recenzie",
-      message: "Esti sigur ca vrei sa stergi aceasta recenzie?",
-      variant: "danger",
-      confirmLabel: "Sterge",
-    });
-    if (!ok) return;
-    try {
-      await APIService.deleteReview(String(reviewId));
-      setReviews(prev => prev.filter(r => r.id !== reviewId));
-      toast.addToast("Recenzie stearsa.", "info");
-    } catch {
-      toast.addToast("Eroare la stergere.", "error");
-    }
-  };
-
-  const sortIcon = (key: SortKey) => {
-    if (sortKey !== key) return "↕";
-    return sortDir === "desc" ? "↓" : "↑";
-  };
-
-  const maxScoreDist = Math.max(...stats.scoreDist, 1);
+  const maxDailyRev = Math.max(...stats.dailySorted.map(([, v]) => v), 1);
+  const maxProductRev = stats.topProducts.length > 0 ? stats.topProducts[0].revenue : 1;
 
   return (
     <div className="flex flex-col min-h-screen bg-[var(--cream)]">
       <MainHeader />
-      {auth.isAdmin && <AdminSubHeader onOpenCreate={() => {}} />}
-
       <main className="flex-grow container mx-auto px-4 py-8 max-w-7xl">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-8 h-[2px] bg-[var(--gold)]" />
+
+        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-serif font-bold text-[var(--noir)]">Recenzii & Sentiment AI</h1>
-            <p className="text-sm text-gray-400 font-light mt-1">Analiza completa a feedback-ului clientilor</p>
+            <h1 className="text-3xl font-serif font-bold text-[var(--noir)]">Dashboard Admin</h1>
+            <p className="text-sm text-gray-400 font-light mt-1">Statistici și analiză AI</p>
+          </div>
+          <div className="flex gap-2">
+            <Link to="/admin/orders" className="px-4 py-2 rounded-xl border border-gray-200 text-xs font-medium
+                     hover:border-[var(--gold)]/40 transition-colors">📦 Comenzi</Link>
+            <Link to="/admin/reviews" className="px-4 py-2 rounded-xl border border-gray-200 text-xs font-medium
+                     hover:border-[var(--gold)]/40 transition-colors">🤖 Recenzii AI</Link>
+            <Link to="/users" className="px-4 py-2 rounded-xl border border-gray-200 text-xs font-medium
+                     hover:border-[var(--gold)]/40 transition-colors">👥 Utilizatori</Link>
           </div>
         </div>
 
@@ -202,230 +134,207 @@ const AdminReviewsPage: FC = () => {
         ) : (
           <div className="space-y-6">
 
-            {/* ── KPI Row ──────────────────────────────────────────── */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {/* ── KPI Cards ──────────────────────────────────────── */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: "Total Recenzii", value: String(stats.total), accent: true },
-                { label: "Rating Mediu", value: stats.avgRating > 0 ? stats.avgRating.toFixed(1) + " ★" : "—" },
-                { label: "Scor AI Mediu", value: stats.avgScore > 0 ? stats.avgScore.toFixed(1) + "/5" : "—" },
-                { label: "Analizate AI", value: String(stats.analyzed) },
-                { label: "In Asteptare", value: String(stats.pen) },
-              ].map(({ label, value, accent }) => (
-                <div key={label} className={`rounded-2xl p-4 border transition-all ${accent
-                  ? "bg-[var(--noir)] text-white border-transparent"
-                  : "bg-white border-gray-100"}`}>
-                  <p className={`text-[10px] uppercase tracking-[0.2em] font-semibold mb-1 ${accent ? "text-[var(--gold)]" : "text-gray-400"}`}>
-                    {label}
+                { label: "Venituri Totale", value: `${stats.revenue.toFixed(0)} RON`, accent: true,
+                  icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+                  trend: stats.revenue > 0 ? "+100%" : "" },
+                { label: "Comenzi", value: String(stats.totalOrders),
+                  icon: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4",
+                  trend: `${stats.byStatus.DELIVERED || 0} livrate` },
+                { label: "Valoare Medie", value: `${stats.avgOrder.toFixed(0)} RON`,
+                  icon: "M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z",
+                  trend: "per comanda" },
+                { label: "Recenzii AI", value: String(stats.totalReviews),
+                  icon: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z",
+                  trend: stats.avgRating > 0 ? `${stats.avgRating.toFixed(1)} ★` : "" },
+              ].map(({ label, value, accent, icon, trend }) => (
+                <div key={label} className={`rounded-2xl p-5 border transition-all hover:shadow-lg ${accent
+                  ? "bg-[var(--noir)] text-white border-transparent hover:shadow-[var(--gold)]/10"
+                  : "bg-white border-gray-100 hover:border-[var(--gold)]/20"}`}>
+                  <div className="flex items-start justify-between mb-3">
+                    <p className={`text-[10px] uppercase tracking-[0.2em] font-semibold ${accent ? "text-[var(--gold)]" : "text-gray-400"}`}>
+                      {label}
+                    </p>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${accent ? "bg-[var(--gold)]/20" : "bg-[var(--cream)]"}`}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke={accent ? "var(--gold)" : "var(--gold-dark)"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d={icon} />
+                      </svg>
+                    </div>
+                  </div>
+                  <p className={`text-2xl font-bold mb-1 ${accent ? "text-white" : "text-[var(--noir)]"}`}>
+                    {value}
                   </p>
-                  <p className={`text-xl font-bold ${accent ? "text-white" : "text-[var(--noir)]"}`}>{value}</p>
+                  {trend && (
+                    <p className={`text-[10px] font-medium ${accent ? "text-[var(--gold)]/60" : "text-gray-300"}`}>
+                      {trend}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
 
-            {/* ── Charts Row ───────────────────────────────────────── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* ── Revenue Chart + Order Status ────────────────────── */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-              {/* Sentiment distribution bar chart */}
-              <div className="bg-white rounded-2xl border border-gray-100 p-6">
-                <h3 className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-semibold mb-5">
-                  Distributia Sentimentului
+              {/* Revenue bar chart */}
+              <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
+                <h3 className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-semibold mb-4">
+                  Venituri Zilnice (ultimele 14 zile)
                 </h3>
-                <div className="space-y-4">
-                  {[
-                    { label: "Pozitive", count: stats.pos, color: "bg-emerald-400", emoji: "😊" },
-                    { label: "Mixte",    count: stats.mix, color: "bg-amber-400",   emoji: "😐" },
-                    { label: "Negative", count: stats.neg, color: "bg-red-400",     emoji: "😞" },
-                    { label: "Pending",  count: stats.pen, color: "bg-gray-300",    emoji: "🔄" },
-                  ].map(({ label, count, color, emoji }) => (
-                    <div key={label} className="flex items-center gap-3">
-                      <span className="text-lg w-8">{emoji}</span>
-                      <span className="text-sm text-gray-600 w-20">{label}</span>
-                      <div className="flex-1 h-8 bg-gray-50 rounded-lg overflow-hidden relative">
+                {stats.dailySorted.length === 0 ? (
+                  <p className="text-sm text-gray-300 py-8 text-center">Nicio comandă înregistrată.</p>
+                ) : (
+                  <div className="flex items-end gap-1.5 h-40">
+                    {stats.dailySorted.map(([day, val]) => (
+                      <div key={day} className="flex-1 flex flex-col items-center gap-1">
                         <div
-                          className={`h-full ${color} rounded-lg transition-all duration-700 flex items-center justify-end pr-2`}
-                          style={{ width: stats.total > 0 ? `${Math.max((count / stats.total) * 100, count > 0 ? 8 : 0)}%` : "0%" }}
-                        >
-                          {count > 0 && (
-                            <span className="text-white text-xs font-bold">{count}</span>
-                          )}
-                        </div>
-                        {count === 0 && (
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-300">0</span>
-                        )}
+                          className="w-full rounded-t-md bg-gradient-to-t from-[var(--gold-dark)] to-[var(--gold)] transition-all duration-500 min-h-[4px]"
+                          style={{ height: `${(val / maxDailyRev) * 100}%` }}
+                          title={`${day}: ${val.toFixed(0)} RON`}
+                        />
+                        <span className="text-[8px] text-gray-300 -rotate-45 origin-center whitespace-nowrap">
+                          {day.slice(5)}
+                        </span>
                       </div>
-                      <span className="text-xs text-gray-400 w-12 text-right">
-                        {stats.total > 0 ? ((count / stats.total) * 100).toFixed(0) : 0}%
-                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Order status distribution */}
+              <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                <h3 className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-semibold mb-4">
+                  Status Comenzi
+                </h3>
+                <div className="space-y-3">
+                  {Object.entries(stats.byStatus).map(([status, count]) => (
+                    <div key={status} className="flex items-center gap-3">
+                      <div className={`w-3 h-3 rounded-full ${STATUS_COLORS[status] || "bg-gray-300"}`} />
+                      <span className="text-xs text-gray-600 flex-1">{status}</span>
+                      <span className="text-sm font-bold text-[var(--noir)]">{count}</span>
                     </div>
                   ))}
                 </div>
-              </div>
 
-              {/* AI Score distribution (1-5) */}
-              <div className="bg-white rounded-2xl border border-gray-100 p-6">
-                <h3 className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-semibold mb-5">
-                  Distributia Scorului AI (1-5)
+                {/* Payment methods */}
+                <h3 className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-semibold mt-6 mb-3">
+                  Metode de Plată
                 </h3>
-                <div className="flex items-end gap-3 h-44">
-                  {stats.scoreDist.map((count, i) => (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                      <span className="text-xs font-bold text-[var(--noir)]">{count}</span>
-                      <div className="w-full rounded-t-lg bg-gray-50 relative" style={{ height: "100%" }}>
-                        <div
-                          className="absolute bottom-0 w-full rounded-t-lg bg-gradient-to-t from-[var(--gold-dark)] to-[var(--gold)] transition-all duration-700"
-                          style={{ height: `${(count / maxScoreDist) * 100}%`, minHeight: count > 0 ? "4px" : "0" }}
-                        />
-                      </div>
-                      <div className="text-center">
-                        <span className="text-[var(--gold)] text-sm">{"★".repeat(i + 1)}</span>
-                        <p className="text-[10px] text-gray-400">{i + 1}/5</p>
-                      </div>
+                <div className="space-y-2">
+                  {Object.entries(stats.paymentMethods).map(([method, count]) => (
+                    <div key={method} className="flex items-center justify-between text-xs">
+                      <span className="text-gray-600">
+                        {method === "card" ? "💳 Card" : method === "cash" ? "💵 Ramburs" : "🏦 Transfer"}
+                      </span>
+                      <span className="font-bold text-[var(--noir)]">{count}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* ── Filters & Sort ───────────────────────────────────── */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <div className="flex flex-wrap items-center gap-3 mb-4">
-                {/* Sentiment filter pills */}
-                <div className="flex gap-1.5 flex-wrap">
-                  {([
-                    { key: "all", label: "Toate", count: stats.total },
-                    { key: "positive", label: "😊 Pozitive", count: stats.pos },
-                    { key: "mixed", label: "😐 Mixte", count: stats.mix },
-                    { key: "negative", label: "😞 Negative", count: stats.neg },
-                    { key: "pending", label: "🔄 Pending", count: stats.pen },
-                  ] as { key: SentimentFilter; label: string; count: number }[]).map(({ key, label, count }) => (
-                    <button key={key} onClick={() => setSentimentFilter(key)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all
-                        ${sentimentFilter === key
-                          ? "bg-[var(--noir)] text-white"
-                          : "bg-gray-50 text-gray-500 hover:bg-gray-100"}`}>
-                      {label} <span className="opacity-60">({count})</span>
-                    </button>
-                  ))}
-                </div>
+            {/* ── Top Products + AI Sentiment ─────────────────────── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-                {/* Search */}
-                <div className="flex-1 min-w-[200px]">
-                  <input type="text" placeholder="Cauta dupa produs, user, comentariu..."
-                    className="w-full px-4 py-2 rounded-xl border border-gray-200 text-sm
-                               focus:border-[var(--gold)] focus:outline-none"
-                    value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-                </div>
-              </div>
-
-              {/* Sort buttons */}
-              <div className="flex gap-2 mb-4">
-                <span className="text-[10px] text-gray-400 uppercase tracking-wider self-center mr-1">Sorteaza:</span>
-                {([
-                  { key: "date" as SortKey, label: "Data" },
-                  { key: "rating" as SortKey, label: "Rating" },
-                  { key: "sentimentScore" as SortKey, label: "Scor AI" },
-                  { key: "sentiment" as SortKey, label: "Sentiment" },
-                ]).map(({ key, label }) => (
-                  <button key={key} onClick={() => handleSort(key)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1
-                      ${sortKey === key ? "bg-[var(--gold)]/10 text-[var(--gold-dark)] border border-[var(--gold)]/20" : "text-gray-400 hover:text-gray-600"}`}>
-                    {label} <span className="text-[10px]">{sortIcon(key)}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Reviews list */}
-              <div className="space-y-3">
-                {filteredReviews.length === 0 && (
-                  <p className="text-center text-gray-300 py-8">Nicio recenzie gasita.</p>
-                )}
-
-                {filteredReviews.map(review => {
-                  const prod = products.get(review.productId);
-                  const sentCfg = SENTIMENT_CONFIG[review.sentiment] || SENTIMENT_CONFIG.pending;
-
-                  return (
-                    <div key={review.id} className="flex gap-4 p-4 rounded-xl border border-gray-50 hover:border-gray-100 hover:bg-gray-50/50 transition-all">
-
-                      {/* Product thumbnail */}
-                      <Link to={`/product/${review.productId}`} className="flex-shrink-0">
-                        <div className="w-14 h-14 rounded-lg overflow-hidden bg-gray-100">
-                          {prod?.imageUrl ? (
-                            <img src={prod.imageUrl} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-300 text-lg">📦</div>
-                          )}
-                        </div>
-                      </Link>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 flex-wrap">
-                          <div>
-                            <Link to={`/product/${review.productId}`}
-                              className="text-sm font-semibold text-[var(--noir)] hover:text-[var(--gold-dark)] transition-colors">
-                              {prod?.name || `Produs #${review.productId}`}
-                            </Link>
-                            {prod?.brand && <span className="text-xs text-gray-400 ml-1.5">· {prod.brand}</span>}
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {/* Stars */}
-                            <span className="text-[var(--gold)] text-sm">
-                              {"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}
-                            </span>
-                            {/* Sentiment badge */}
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${sentCfg.cls}`}>
-                              {sentCfg.icon} {sentCfg.label}
-                              {review.sentimentScore ? ` (${review.sentimentScore}/5)` : ""}
-                            </span>
+              {/* Top products by revenue */}
+              <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                <h3 className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-semibold mb-4">
+                  Top Produse (după venituri)
+                </h3>
+                {stats.topProducts.length === 0 ? (
+                  <p className="text-sm text-gray-300 py-4 text-center">Nicio vânzare.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {stats.topProducts.map((p, i) => (
+                      <div key={p.name} className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-gray-300 w-5">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-[var(--noir)] truncate">{p.name}</p>
+                          <div className="mt-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                            <div className="h-full rounded-full bg-gradient-to-r from-[var(--gold-dark)] to-[var(--gold)] transition-all duration-500"
+                              style={{ width: `${(p.revenue / maxProductRev) * 100}%` }} />
                           </div>
                         </div>
-
-                        {/* Comment */}
-                        <p className="text-sm text-gray-500 mt-1.5 line-clamp-2 font-light">{review.comment}</p>
-
-                        {/* AI Summary */}
-                        {review.sentimentSummary && review.sentiment !== "pending" && (
-                          <div className="mt-2 px-3 py-2 bg-[var(--cream)] rounded-lg">
-                            <p className="text-[11px] text-gray-400">
-                              <span className="mr-1">🤖</span>
-                              <span className="font-medium text-gray-500">AI:</span> {review.sentimentSummary}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Meta row */}
-                        <div className="flex items-center gap-3 mt-2 flex-wrap">
-                          <span className="text-[10px] text-gray-300">
-                            <span className="font-medium text-gray-400">{review.userName}</span>
-                            {" · "}
-                            {new Date(review.createdAt).toLocaleDateString("ro-RO", { day: "numeric", month: "short", year: "numeric" })}
-                          </span>
-                          <button onClick={() => void handleDelete(review.id)}
-                            className="text-[10px] text-gray-300 hover:text-red-500 transition-colors ml-auto">
-                            Sterge
-                          </button>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-sm font-bold text-[var(--noir)]">{p.revenue.toFixed(0)} RON</p>
+                          <p className="text-[10px] text-gray-400">{p.qty} buc.</p>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Count footer */}
-              <p className="text-xs text-gray-300 text-center mt-4 pt-4 border-t border-gray-50">
-                {filteredReviews.length} din {stats.total} recenzii
-              </p>
+              {/* AI Sentiment analysis */}
+              <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                <h3 className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-semibold mb-4">
+                  Analiza AI — Sentimentul Recenziilor
+                </h3>
+
+                {stats.sentTotal === 0 ? (
+                  <p className="text-sm text-gray-300 py-4 text-center">Nicio recenzie analizată.</p>
+                ) : (
+                  <>
+                    {/* Donut-style display */}
+                    <div className="flex items-center justify-center gap-8 py-4">
+                      <div className="text-center">
+                        <div className="text-4xl font-bold text-[var(--noir)]">
+                          {stats.avgRating.toFixed(1)}
+                        </div>
+                        <div className="text-[var(--gold)] text-lg mt-1">
+                          {"★".repeat(Math.round(stats.avgRating))}{"☆".repeat(5 - Math.round(stats.avgRating))}
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-1">{stats.totalReviews} recenzii</p>
+                      </div>
+                    </div>
+
+                    {/* Sentiment bar */}
+                    <div className="h-3 rounded-full overflow-hidden bg-gray-100 mb-4">
+                      {stats.sentPos > 0 && (
+                        <div className="h-full bg-emerald-400 inline-block"
+                          style={{ width: `${(stats.sentPos / stats.sentTotal) * 100}%` }} />
+                      )}
+                      {stats.sentMix > 0 && (
+                        <div className="h-full bg-amber-400 inline-block"
+                          style={{ width: `${(stats.sentMix / stats.sentTotal) * 100}%` }} />
+                      )}
+                      {stats.sentNeg > 0 && (
+                        <div className="h-full bg-red-400 inline-block"
+                          style={{ width: `${(stats.sentNeg / stats.sentTotal) * 100}%` }} />
+                      )}
+                    </div>
+
+                    {/* Legend */}
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { label: "Pozitive", count: stats.sentPos, color: "bg-emerald-400", pct: ((stats.sentPos / stats.sentTotal) * 100).toFixed(0) },
+                        { label: "Mixte",    count: stats.sentMix, color: "bg-amber-400",   pct: ((stats.sentMix / stats.sentTotal) * 100).toFixed(0) },
+                        { label: "Negative", count: stats.sentNeg, color: "bg-red-400",     pct: ((stats.sentNeg / stats.sentTotal) * 100).toFixed(0) },
+                      ].map(({ label, count, color, pct }) => (
+                        <div key={label} className="text-center">
+                          <div className="flex items-center justify-center gap-1.5 mb-1">
+                            <span className={`w-2.5 h-2.5 rounded-full ${color}`} />
+                            <span className="text-xs text-gray-500">{label}</span>
+                          </div>
+                          <p className="text-lg font-bold text-[var(--noir)]">{count}</p>
+                          <p className="text-[10px] text-gray-400">{pct}%</p>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
           </div>
         )}
       </main>
-
-      <ConfirmModal {...confirmModalProps} />
       <MainFooter />
     </div>
   );
 };
 
-export default AdminReviewsPage;
+export default AdminDashboardPage;
