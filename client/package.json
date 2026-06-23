@@ -19,6 +19,7 @@
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.15.1",
+    "server": "^1.0.42",
     "zustand": "^4.5.4"
   },
   "devDependencies": {
