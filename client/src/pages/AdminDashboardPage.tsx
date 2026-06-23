@@ -179,30 +179,36 @@ const AdminDashboardPage: FC = () => {
             {/* ── Revenue Chart + Order Status ────────────────────── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-              {/* Revenue bar chart */}
-              <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
-                <h3 className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-semibold mb-4">
-                  Venituri Zilnice (ultimele 14 zile)
-                </h3>
-                {stats.dailySorted.length === 0 ? (
-                  <p className="text-sm text-gray-300 py-8 text-center">Nicio comandă înregistrată.</p>
-                ) : (
-                  <div className="flex items-end gap-1.5 h-40">
-                    {stats.dailySorted.map(([day, val]) => (
-                      <div key={day} className="flex-1 flex flex-col items-center gap-1">
-                        <div
-                          className="w-full rounded-t-md bg-gradient-to-t from-[var(--gold-dark)] to-[var(--gold)] transition-all duration-500 min-h-[4px]"
-                          style={{ height: `${(val / maxDailyRev) * 100}%` }}
-                          title={`${day}: ${val.toFixed(0)} RON`}
-                        />
-                        <span className="text-[8px] text-gray-300 -rotate-45 origin-center whitespace-nowrap">
-                          {day.slice(5)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+             {/* Revenue bar chart */}
+<div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
+  <h3 className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-semibold mb-4">
+    Venituri Zilnice (ultimele 14 zile)
+  </h3>
+  {stats.dailySorted.length === 0 ? (
+    <p className="text-sm text-gray-300 py-16 text-center">Nicio comandă înregistrată în ultimele 14 zile.</p>
+  ) : (
+    <div className="flex items-end justify-start gap-4 h-44 pt-4 pb-6 overflow-x-auto no-scrollbar">
+      {stats.dailySorted.map(([day, val]) => (
+        <div key={day} className="flex-1 min-w-[40px] flex flex-col items-center h-full justify-end gap-2 group relative">
+          
+          <div className="absolute -top-4 opacity-0 group-hover:opacity-100 bg-[var(--noir)] text-white text-[9px] px-1.5 py-0.5 rounded shadow transition-opacity font-bold z-10 whitespace-nowrap">
+            {val.toFixed(0)} RON
+          </div>
+
+          <div
+            className="w-full rounded-t-lg bg-gradient-to-t from-[var(--gold-dark)] to-[var(--gold)] transition-all duration-700 shadow-sm group-hover:brightness-110"
+            style={{ height: `${Math.max((val / maxDailyRev) * 100, 4)}%` }} // Garantăm un minim de 4% înălțime ca să fie vizibilă dacă suma e infimă
+            title={`${day}: ${val.toFixed(0)} RON`}
+          />
+          
+          <span className="text-[9px] text-gray-400 font-medium whitespace-nowrap mt-1 block">
+            {day && day !== "unknown" ? day.slice(5) : "Info"}
+          </span>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
 
               {/* Order status distribution */}
               <div className="bg-white rounded-2xl border border-gray-100 p-5">
