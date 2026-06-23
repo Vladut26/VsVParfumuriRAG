@@ -43,8 +43,8 @@ public class SecurityConfig {
                                         "script-src 'self' 'unsafe-inline' https://js.stripe.com; " +
                                         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://m.stripe.network; " +
                                         "frame-src 'self' https://js.stripe.com https://hooks.stripe.com; " +
-                                        "connect-src 'self' https://api.stripe.com https://m.stripe.network; " +
-                                        "img-src 'self' data: https://*.cloudinary.com; " + 
+                                        "connect-src 'self' https://api.stripe.com https://m.stripe.network https://vsvparfumurirag-production-6e9e.up.railway.app; " +
+                                        "img-src 'self' data: https://*.cloudinary.com https://images.unsplash.com; " +
                                         "frame-ancestors 'self';")
                         )
                 )

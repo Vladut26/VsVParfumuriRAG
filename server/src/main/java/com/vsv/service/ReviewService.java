@@ -9,6 +9,7 @@ import com.vsv.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
@@ -29,6 +30,8 @@ public class ReviewService {
     private final ReviewRepository reviewRepository;
     private final UserRepository   userRepository;
     private final RestClient       restClient;
+    @Value("${ai.service.base-url:http://localhost:8000}")
+    private String aiBaseUrl;
 
     public ReviewService(ReviewRepository reviewRepository,
                          UserRepository userRepository,
@@ -131,7 +134,7 @@ public class ReviewService {
         try {
             @SuppressWarnings("unchecked")
             Map<String, Object> result = restClient.post()
-                    .uri("http://localhost:8000/analyze")
+                    .uri(aiBaseUrl+"/analyze")
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("comment", comment))
                     .retrieve()
