@@ -6,6 +6,7 @@ import { useCartStore }     from "../stores/cart";
 import { useToastStore }    from "../stores/toast";
 import type { Product }     from "../stores/products";
 import APIService           from "../services/APIService";
+import { useChatStore }      from "../stores/chat";
 import MainHeader           from "../components/MainHeader";
 import MainFooter           from "../components/MainFooter";
 import AdminSubHeader       from "../components/AdminSubHeader";
@@ -85,9 +86,10 @@ const HomePage: FC = () => {
   const [heroQuery, setHeroQuery]       = useState("");
   const { confirm, confirmModalProps }   = useConfirm();
 
-  // Inline AI chat state
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatLoading, setChatLoading]   = useState(false);
+  // Inline AI chat state (shared with floating chatbot)
+  const chatStore = useChatStore();
+  const chatMessages = chatStore.messages;
+  const chatLoading  = chatStore.loading;
   const [typingMsg, setTypingMsg]       = useState(TYPING_MESSAGES[0]);
   const chatEndRef     = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -180,19 +182,17 @@ const HomePage: FC = () => {
     if (!msg || chatLoading) return;
 
     setHeroQuery("");
-    setChatMessages(prev => [...prev, { role: "user", content: msg }]);
-    setChatLoading(true);
+    chatStore.addMessage({ role: "user", content: msg });
+    chatStore.setLoading(true);
 
     try {
-      const history = chatMessages.map(m => ({ role: m.role, content: m.content }));
+      const history = chatStore.messages.map(m => ({ role: m.role, content: m.content }));
       const res = await APIService.chat({ message: msg, history });
       const data = res.data as { reply: string; products?: RecProduct[] };
-      setChatMessages(prev => [...prev, {
-        role: "assistant", content: data.reply || "", products: data.products || [],
-      }]);
+      chatStore.addMessage({ role: "assistant", content: data.reply || "", products: data.products || [] });
     } catch {
-      setChatMessages(prev => [...prev, { role: "assistant", content: "Imi pare rau, am intampinat o eroare. Incearca din nou." }]);
-    } finally { setChatLoading(false); }
+      chatStore.addMessage({ role: "assistant", content: "Imi pare rau, am intampinat o eroare. Incearca din nou." });
+    } finally { chatStore.setLoading(false); }
   };
 
   const handleHeroSubmit = () => {
@@ -205,7 +205,7 @@ const HomePage: FC = () => {
 
   // FIX #3: Clear chat
   const clearChat = () => {
-    setChatMessages([]);
+    chatStore.clearMessages();
     setHeroQuery("");
   };
 

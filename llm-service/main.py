@@ -11,7 +11,7 @@ filtering.py          — extragerea cuvintelor cheie din catalog și scorare
 gemini_service.py     — Gemini RAG: preluare catalog, construire prompt, apel API
 
 uvicorn main:app --reload --port 8000
-$ source venv/Scripts/activate
+source venv/Scripts/activate
 """
 import asyncio
 from contextlib import asynccontextmanager
@@ -75,7 +75,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080", "http://localhost:5173"],
+    allow_origins=["http://localhost:8080", "http://localhost:5173", "https://vsvparfumurirag-production-6e9e.up.railway.app", "https://vsvparfumurirag-production.up.railway.app"],
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
