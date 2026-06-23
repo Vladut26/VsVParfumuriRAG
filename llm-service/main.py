@@ -1,17 +1,15 @@
 """
 VSV AI Service — FastAPI Inference Gateway v3
-/analyze  — analiză de sentiment prin HuggingFace RoBERTa (local, fără API extern)
-/chat     — chatbot RAG prin Gemini cu filtrare inteligentă a catalogului
-/health   — verificarea stării sistemului (status check)
+==============================================
+/analyze  — sentiment analysis via HuggingFace RoBERTa (local, no external API)
+/chat     — RAG chatbot via Gemini with smart catalog filtering
+/health   — status check
 
-Module:
-config.py             — variabile de mediu, jurnalizare (logging), scheme
-sentiment_service.py  — analiză de sentiment HuggingFace RoBERTa
-filtering.py          — extragerea cuvintelor cheie din catalog și scorare
-gemini_service.py     — Gemini RAG: preluare catalog, construire prompt, apel API
-
-uvicorn main:app --reload --port 8000
-source venv/Scripts/activate
+Modules:
+  config.py             — env vars, logging, schemas
+  sentiment_service.py  — HuggingFace RoBERTa sentiment analysis
+  filtering.py          — catalog keyword extraction & scoring
+  gemini_service.py     — Gemini RAG: catalog fetch, prompt build, API call
 """
 import asyncio
 from contextlib import asynccontextmanager
@@ -35,7 +33,7 @@ from gemini_service import (
 )
 
 
-#  App lifespan
+# ── App lifespan ──────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -64,7 +62,7 @@ async def lifespan(app: FastAPI):
     logger.info("VSV AI Service shutting down.")
 
 
-# FastAPI app 
+# ── FastAPI app ───────────────────────────────────────────────────────────────
 
 app = FastAPI(
     title="VSV AI Service",
@@ -75,7 +73,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080", "http://localhost:5173", "https://vsvparfumurirag-production-6e9e.up.railway.app", "https://vsvparfumurirag-production.up.railway.app"],
+    allow_origins=["http://localhost:8080", "http://localhost:5173"],
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
@@ -90,7 +88,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Routes 
+# ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.post("/analyze", response_model=ReviewAnalysisResponse)
 async def analyze_review(request: ReviewAnalysisRequest) -> ReviewAnalysisResponse:
@@ -152,8 +150,27 @@ async def chat(request: ChatRequest) -> ChatResponse:
     if not reply:
         reply = "Îmi pare rău, nu am putut genera un răspuns. Te rog să încerci din nou."
 
+    # Build recommended product cards — only products Gemini actually mentioned
+    reply_lower = reply.lower()
+    mentioned = []
+    not_mentioned = []
+
+    for p in relevant:
+        name = (p.get("name") or "").lower()
+        brand = (p.get("brand") or "").lower()
+        # Check if product name or "brand + descriptor" appears in the reply
+        if name and name in reply_lower:
+            mentioned.append(p)
+        elif brand and any(word in reply_lower for word in name.split() if len(word) > 3):
+            mentioned.append(p)
+        else:
+            not_mentioned.append(p)
+
+    # Show mentioned products first, pad with others if needed (max 4)
+    cards_source = (mentioned + not_mentioned)[:4] if mentioned else relevant[:4]
+
     rec_products = []
-    for p in relevant[:6]:  # max 6 product cards
+    for p in cards_source:
         stock = p.get("stock") or {}
         qty = stock.get("quantity", 0) or 0
         cat = p.get("category") or {}
