@@ -21,11 +21,11 @@ interface RecProduct {
   id: number; name: string; brand?: string; price: number;
   imageUrl?: string; category?: string; inStock: boolean;
 }
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-  products?: RecProduct[];
-}
+// interface ChatMessage {
+//   role: "user" | "assistant";
+//   content: string;
+//   products?: RecProduct[];
+// }
 
 const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' fill='%23C9A96E' viewBox='0 0 24 24'%3E%3Cpath d='M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z'/%3E%3C/svg%3E";
 
