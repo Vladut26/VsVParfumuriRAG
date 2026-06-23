@@ -31,7 +31,7 @@ public class EmailService {
     @Value("${vsv.email.enabled:false}")
     private boolean emailEnabled;
 
-    @Value("${vsv.email.from:noreply@vsv-parfumuri.ro}")
+    @Value("${EMAIL_USERNAME:noreply@vsv-parfumuri.ro}")
     private String fromAddress;
 
     @Autowired(required = false)
