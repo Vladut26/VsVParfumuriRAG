@@ -1,8 +1,11 @@
 [variables]
-NIXPACKS_NODE_VERSION = "24.13.0"
+NIXPACKS_NODE_VERSION = "22.14.0"
 
 [phases.install]
-cmds = ["rm -rf node_modules package-lock.json", "npm install --include=optional"]
+cmds = [
+  "rm -rf node_modules package-lock.json",
+  "npm install --include=optional"
+]
 
 [phases.build]
 cmds = ["npm run build"]
