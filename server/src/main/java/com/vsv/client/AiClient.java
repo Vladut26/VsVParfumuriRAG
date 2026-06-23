@@ -1,5 +1,6 @@
 package com.vsv.client;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import java.util.Map;
@@ -8,9 +9,9 @@ import java.util.Map;
 public class AiClient {
     private final RestClient restClient;
 
-    public AiClient() {
+    public AiClient(@Value("${ai.service.base-url:http://localhost:8000}") String aiBaseUrl) {
         this.restClient = RestClient.builder()
-                .baseUrl("http://localhost:8000") // Your Python FastAPI port
+                .baseUrl(aiBaseUrl)
                 .build();
     }
 

@@ -44,7 +44,7 @@ public class SecurityConfig {
                                         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://m.stripe.network; " +
                                         "frame-src 'self' https://js.stripe.com https://hooks.stripe.com; " +
                                         "connect-src 'self' https://api.stripe.com https://m.stripe.network; " +
-                                        "img-src 'self' data: https://*.cloudinary.com; " + // Permite imagini din Cloudinary local/extern
+                                        "img-src 'self' data: https://*.cloudinary.com; " + 
                                         "frame-ancestors 'self';")
                         )
                 )

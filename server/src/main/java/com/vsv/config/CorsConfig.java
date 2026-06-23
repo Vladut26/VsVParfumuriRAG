@@ -15,6 +15,7 @@ public class CorsConfig {
 
         config.addAllowedOrigin("http://localhost:5173");
         config.addAllowedOrigin("http://localhost:3000");
+        config.addAllowedOrigin("https://vsvparfumurirag-production-6e9e.up.railway.app");
 
         config.addAllowedMethod("GET");
         config.addAllowedMethod("POST");
