@@ -10,6 +10,10 @@ Modules:
   sentiment_service.py  — HuggingFace RoBERTa sentiment analysis
   filtering.py          — catalog keyword extraction & scoring
   gemini_service.py     — Gemini RAG: catalog fetch, prompt build, API call
+
+  uvicorn main:app --reload --port 8000
+
+  source venv/Scripts/activate
 """
 import asyncio
 from contextlib import asynccontextmanager

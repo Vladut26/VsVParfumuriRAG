@@ -43,7 +43,7 @@ public class SecurityConfig {
                                         "script-src 'self' 'unsafe-inline' https://js.stripe.com; " +
                                         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://m.stripe.network; " +
                                         "frame-src 'self' https://js.stripe.com https://hooks.stripe.com; " +
-                                        "connect-src 'self' https://api.stripe.com https://m.stripe.network https://vsvparfumurirag-production-6e9e.up.railway.app; " +
+                                        "connect-src 'self' https://api.stripe.com https://m.stripe.network https://vsvparfumurirag-production-6e9e.up.railway.app http://localhost:8080; " +
                                         "img-src 'self' data: https://*.cloudinary.com https://images.unsplash.com; " +
                                         "frame-ancestors 'self';")
                         )
@@ -57,6 +57,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/payments/config").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/payments/webhook").permitAll()
+                        .requestMatchers("/api/webhooks/stripe").permitAll()
 
                         // Admin
                         .requestMatchers(HttpMethod.POST,   "/api/products/**").hasRole("ADMIN")
